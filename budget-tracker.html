@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Match Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --pitch-900:#0f2a1f; --pitch-700:#1b4332; --pitch-500:#2d6a4f; --pitch-300:#74a58b;
+    --chalk:#faf8f3; --chalk-dim:#eef0ea; --ink:#182119; --ink-soft:#5b6660;
+    --gold:#e0a94a; --red:#c1443c; --line:#dcdfd6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--chalk); color:var(--ink); font-family:'Inter',sans-serif; padding-bottom:90px;}
+  .scoreboard{background:linear-gradient(180deg,var(--pitch-900),var(--pitch-700) 85%); color:var(--chalk); padding:20px 18px 24px; border-bottom:4px solid var(--gold);}
+  .sb-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+  .month-nav{display:flex; align-items:center; gap:10px; font-family:'Oswald',sans-serif; font-size:14px; letter-spacing:2px; text-transform:uppercase;}
+  .month-nav button{background:rgba(255,255,255,0.12); border:none; color:var(--chalk); width:28px; height:28px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .today-btn{font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:1px; color:var(--pitch-300); background:none; border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:4px 9px; cursor:pointer;}
+  .sb-net-label{font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--pitch-300); margin-bottom:2px;}
+  .sb-net{font-family:'Oswald',sans-serif; font-weight:700; font-size:50px; line-height:1; letter-spacing:-1px;}
+  .sb-net.negative{color:#f2a49c;}
+  .sb-sub{display:flex; gap:22px; margin-top:14px; font-family:'Roboto Mono',monospace;}
+  .sb-sub div{font-size:13px; color:var(--pitch-300);}
+  .sb-sub .val{display:block; font-size:18px; color:var(--chalk); font-weight:700; margin-top:2px;}
+
+  .wrap{padding:18px;}
+  .section-label{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; letter-spacing:2px; text-transform:uppercase; color:var(--pitch-700); margin:26px 0 12px; display:flex; align-items:center; justify-content:space-between;}
+  .section-label .lbl{display:flex; align-items:center; gap:8px;}
+  .section-label .lbl::before{content:''; width:5px; height:16px; background:var(--gold); display:inline-block; border-radius:1px;}
+  .edit-goals-btn{font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--pitch-500); text-transform:none; letter-spacing:0; background:none; border:none; cursor:pointer; text-decoration:underline;}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:10px;}
+
+  .cat-card{margin-bottom:12px;}
+  .cat-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .cat-name{font-weight:700; font-size:14.5px;}
+  .cat-nums{font-family:'Roboto Mono',monospace; font-size:13px; color:var(--ink-soft);}
+  .cat-nums strong{color:var(--ink); font-size:14px;}
+  .bar-track{height:9px; background:var(--chalk-dim); border-radius:5px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:5px; background:var(--pitch-500); transition:width .3s;}
+  .bar-fill.over{background:var(--red);}
+  .bar-fill.close{background:var(--gold);}
+  .cat-remain{font-size:11.5px; color:var(--ink-soft); margin-top:5px;}
+  .cat-remain.over-text{color:var(--red); font-weight:600;}
+
+  .log-item{display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--chalk-dim);}
+  .log-item:last-child{border-bottom:none;}
+  .log-left{display:flex; flex-direction:column;}
+  .log-cat{font-size:14px; font-weight:600;}
+  .log-meta{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+  .log-amt{font-family:'Roboto Mono',monospace; font-weight:700; font-size:14.5px;}
+  .log-amt.pos{color:var(--pitch-500);}
+  .log-amt.neg{color:var(--ink);}
+  .del-btn{background:none; border:none; color:var(--ink-soft); font-size:18px; padding:0 0 0 12px; cursor:pointer; line-height:1;}
+  .log-row{display:flex; align-items:center; justify-content:space-between; width:100%;}
+
+  .empty{text-align:center; color:var(--ink-soft); font-size:13.5px; padding:20px 0;}
+
+  .fab{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--pitch-700); color:var(--chalk); border:none; font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:1px; font-size:14.5px; text-transform:uppercase; padding:14px 28px; border-radius:30px; box-shadow:0 6px 18px rgba(15,42,31,0.35); display:flex; align-items:center; gap:8px; cursor:pointer;}
+  .fab:active{transform:translateX(-50%) scale(0.97);}
+
+  .sheet-overlay{position:fixed; inset:0; background:rgba(15,20,17,0.45); z-index:50; display:none; align-items:flex-end;}
+  .sheet-overlay.open{display:flex;}
+  .sheet{background:var(--chalk); width:100%; border-radius:18px 18px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto;}
+  .sheet h3{font-family:'Oswald',sans-serif; margin:0 0 14px; font-size:19px; letter-spacing:0.5px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--ink-soft); margin-bottom:6px;}
+  .seg{display:flex; gap:8px;}
+  .seg button{flex:1; padding:10px; border-radius:8px; border:1.5px solid var(--line); background:#fff; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; color:var(--ink-soft); cursor:pointer;}
+  .seg button.active{background:var(--pitch-700); border-color:var(--pitch-700); color:#fff;}
+  select, input[type=text], input[type=number], input[type=date]{width:100%; padding:11px 12px; border-radius:8px; border:1.5px solid var(--line); font-family:'Inter',sans-serif; font-size:15px; background:#fff; color:var(--ink);}
+  .dollar-input{position:relative;}
+  .dollar-input span{position:absolute; left:12px; top:50%; transform:translateY(-50%); font-weight:600; color:var(--ink-soft);}
+  .dollar-input input{padding-left:24px; font-family:'Roboto Mono',monospace; font-weight:700;}
+  .save-btn{width:100%; padding:14px; border:none; border-radius:9px; background:var(--pitch-700); color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:15.5px; letter-spacing:1px; text-transform:uppercase; margin-top:6px; cursor:pointer;}
+  .cancel-btn{width:100%; padding:12px; border:none; background:none; color:var(--ink-soft); font-size:14px; margin-top:4px; cursor:pointer;}
+  .tabs{display:flex; border-bottom:1px solid var(--line); margin-bottom:4px;}
+  .tab{flex:1; text-align:center; padding:11px 0; font-family:'Oswald',sans-serif; font-weight:600; font-size:13.5px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); cursor:pointer; border-bottom:3px solid transparent;}
+  .tab.active{color:var(--pitch-700); border-bottom-color:var(--gold);}
+  .reset-link{text-align:center; font-size:12px; color:var(--ink-soft); margin-top:30px; padding-bottom:10px; text-decoration:underline;}
+  .toast{position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px; font-size:13.5px; z-index:100; opacity:0; transition:opacity .25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+  .goal-edit-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--chalk-dim);}
+  .goal-edit-row:last-child{border-bottom:none;}
+  .goal-edit-row span{font-size:14px; font-weight:600; flex:1;}
+  .goal-edit-row input{width:90px; padding:8px 10px; text-align:right; font-family:'Roboto Mono',monospace; font-weight:700;}
+  .add-cat-row{display:flex; gap:8px; margin-top:12px;}
+  .add-cat-row input{flex:1;}
+  .add-cat-row button{padding:0 16px; border:none; border-radius:8px; background:var(--pitch-500); color:#fff; font-weight:600; cursor:pointer;}
+  .auto-tag{font-size:12px; color:var(--pitch-500); margin-top:6px; display:none; align-items:center; gap:6px;}
+  .auto-tag.show{display:flex;}
+  .auto-tag span.dot{width:6px; height:6px; border-radius:50%; background:var(--pitch-500); display:inline-block;}
+  .chart-card{background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px;}
+  .chart-card h4{margin:0 0 12px; font-family:'Oswald',sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:var(--pitch-700);}
+  .chart-empty{text-align:center; color:var(--ink-soft); font-size:13px; padding:30px 0;}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="scoreboard">
+  <div class="sb-top">
+    <div class="month-nav">
+      <button id="prevMonth">‹</button>
+      <span id="monthLabel">JULY 2026</span>
+      <button id="nextMonth">›</button>
+    </div>
+    <button class="today-btn" id="todayBtn">TODAY</button>
+  </div>
+  <div class="sb-net-label">Net this month</div>
+  <div class="sb-net" id="netTotal">$0</div>
+  <div class="sb-sub">
+    <div>Income<span class="val" id="incomeSoFar">$0</span></div>
+    <div>Spent<span class="val" id="spentSoFar">$0</span></div>
+    <div>All-time net<span class="val" id="allTimeNet">$0</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="tabs">
+    <div class="tab active" data-tab="overview">Checking</div>
+    <div class="tab" data-tab="savings">Savings</div>
+    <div class="tab" data-tab="charts">Charts</div>
+    <div class="tab" data-tab="log">Log</div>
+  </div>
+
+  <div id="tab-overview">
+    <div class="section-label">
+      <span class="lbl">Spending Goals</span>
+      <button class="edit-goals-btn" id="editGoalsBtn">Edit goals</button>
+    </div>
+    <div id="catList"></div>
+  </div>
+
+  <div id="tab-savings" style="display:none;">
+    <div class="card" style="text-align:center; padding:22px 16px;">
+      <div style="font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--ink-soft);">Savings Balance</div>
+      <div style="font-family:'Oswald',sans-serif; font-weight:700; font-size:42px; color:var(--pitch-700); margin:4px 0;" id="savingsBalance">$0</div>
+      <div style="font-size:12.5px; color:var(--ink-soft);" id="savingsApyLine">0.22% APY</div>
+    </div>
+    <div class="section-label"><span class="lbl">Savings Activity</span></div>
+    <div class="card" id="savingsList"></div>
+  </div>
+
+  <div id="tab-charts" style="display:none;">
+    <div class="chart-card">
+      <h4>Spending by Category — This Month</h4>
+      <canvas id="pieChart" height="220"></canvas>
+      <div class="chart-empty" id="pieEmpty" style="display:none;">No expenses logged this month yet.</div>
+    </div>
+    <div class="chart-card">
+      <h4>Income vs Spending — Last 6 Months</h4>
+      <canvas id="barChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <div id="tab-log" style="display:none;">
+    <div class="section-label">
+      <span class="lbl">Transaction Log</span>
+      <button class="edit-goals-btn" id="openImport">Import statement</button>
+    </div>
+    <div class="card" id="logList"></div>
+  </div>
+
+  <div class="reset-link" id="resetLink">Reset all data</div>
+</div>
+
+<button class="fab" id="openAdd">＋ Add Transaction</button>
+<button class="fab" id="openAddSavings" style="display:none; background:var(--gold); color:var(--pitch-900);">＋ Add Savings Entry</button>
+
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="sheet">
+    <h3>Add Transaction</h3>
+    <div class="field">
+      <label>Type</label>
+      <div class="seg">
+        <button type="button" class="seg-in active" data-type="expense">Expense</button>
+        <button type="button" class="seg-in" data-type="income">Income</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Note (merchant / description)</label>
+      <input type="text" id="noteInput" placeholder="e.g. Sheetz, Gary's Bar, Chipotle">
+      <div class="auto-tag" id="autoTag"><span class="dot"></span><span id="autoTagText"></span></div>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="catSelect"></select>
+    </div>
+    <div class="field" id="customCatField" style="display:none;">
+      <label>Custom category name</label>
+      <input type="text" id="customCatInput" placeholder="e.g. Freelance gig">
+    </div>
+    <div class="field">
+      <label>Amount</label>
+      <div class="dollar-input"><span>$</span><input type="number" id="amtInput" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="dateInput">
+    </div>
+    <button class="save-btn" id="saveBtn">Save</button>
+    <button class="cancel-btn" id="cancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="goalsOverlay">
+  <div class="sheet">
+    <h3>Edit Monthly Goals</h3>
+    <div id="goalsEditList"></div>
+    <div class="add-cat-row">
+      <input type="text" id="newCatName" placeholder="New category name">
+      <button id="addCatBtn">Add</button>
+    </div>
+    <button class="save-btn" id="saveGoalsBtn" style="margin-top:16px;">Done</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="importOverlay">
+  <div class="sheet">
+    <h3>Import Statement</h3>
+    <div class="field">
+      <label>Paste your card/bank statement export below</label>
+      <textarea id="importText" rows="8" style="width:100%; padding:11px 12px; border-radius:8px; border:1.5px solid var(--line); font-family:'Roboto Mono',monospace; font-size:12.5px;" placeholder="07/05/2026&#10;SHEETZ 0628&#10;-$29.18&#10;..."></textarea>
+    </div>
+    <div id="importPreview" style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;"></div>
+    <button class="save-btn" id="parseImportBtn">Preview Import</button>
+    <button class="save-btn" id="confirmImportBtn" style="display:none; background:var(--pitch-500);">Add These Transactions</button>
+    <button class="cancel-btn" id="cancelImportBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="savingsOverlay">
+  <div class="sheet">
+    <h3>Add Savings Entry</h3>
+    <div class="field">
+      <label>Type</label>
+      <div class="seg">
+        <button type="button" class="seg-sv active" data-type="deposit">Deposit</button>
+        <button type="button" class="seg-sv" data-type="dividend">Dividend</button>
+        <button type="button" class="seg-sv" data-type="withdrawal">Withdrawal</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Amount</label>
+      <div class="dollar-input"><span>$</span><input type="number" id="svAmtInput" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="svDateInput">
+    </div>
+    <div class="field">
+      <label>Note (optional)</label>
+      <input type="text" id="svNoteInput" placeholder="e.g. Keystone Sports deposit">
+    </div>
+    <button class="save-btn" id="svSaveBtn">Save</button>
+    <button class="cancel-btn" id="svCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CATS = [
+  {id:'fuel', name:'Fuel', goal:220},
+  {id:'cannabis', name:'Medical Cannabis', goal:90},
+  {id:'roth', name:'Roth IRA', goal:100},
+  {id:'subs', name:'Subscriptions', goal:13},
+  {id:'convenience', name:'Gas Station Convenience', goal:80},
+  {id:'bars', name:'Bars / Nightlife', goal:100},
+  {id:'fastfood', name:'Fast Food / Dining Out', goal:80},
+];
+
+const INCOME_PRESETS = ['Paycheck','Reffing','Coaching','Other Income'];
+
+const SEED_TRANSACTIONS = [{"id": "seed1", "type": "income", "category": "Other Income", "amount": 140.0, "date": "2026-07-06", "note": "MOBILE DEPOSIT RECEIVED (1 CHECK)"}, {"id": "seed2", "type": "expense", "category": "UNCATEGORIZED", "amount": 90.0, "date": "2026-07-06", "note": "VENMO"}, {"id": "seed3", "type": "expense", "category": "UNCATEGORIZED", "amount": 6.61, "date": "2026-07-06", "note": "WAL-MART #3541 KENNETT SQ PA"}, {"id": "seed4", "type": "expense", "category": "fuel", "amount": 41.17, "date": "2026-07-06", "note": "COSTCO GAS #1114 GLEN MILLS PA"}, {"id": "seed5", "type": "expense", "category": "convenience", "amount": 29.18, "date": "2026-07-06", "note": "SHEETZ 0628 HARRISBURG PA"}, {"id": "seed6", "type": "expense", "category": "fuel", "amount": 35.53, "date": "2026-07-06", "note": "SHEETZ 0628 HARRISBURG PA"}, {"id": "seed7", "type": "expense", "category": "convenience", "amount": 29.18, "date": "2026-07-05", "note": "SHEETZ 0628"}, {"id": "seed8", "type": "expense", "category": "fuel", "amount": 35.53, "date": "2026-07-05", "note": "SHEETZ 0628"}, {"id": "seed9", "type": "expense", "category": "fastfood", "amount": 4.0, "date": "2026-07-05", "note": "DUNKIN' MOBILE AP DUNKIN'"}, {"id": "seed10", "type": "expense", "category": "UNCATEGORIZED", "amount": 12.96, "date": "2026-07-05", "note": "REDNERS MKTS #60 PALMYRA PA"}, {"id": "seed11", "type": "expense", "category": "UNCATEGORIZED", "amount": 5.18, "date": "2026-07-05", "note": "REDNERS MKTS #60 PALMYRA PA"}, {"id": "seed12", "type": "expense", "category": "UNCATEGORIZED", "amount": 5.3, "date": "2026-07-04", "note": "DOLLAR TREE 109 NORTHSIDE CMNS PALMYRA PA"}, {"id": "seed13", "type": "expense", "category": "fastfood", "amount": 12.19, "date": "2026-07-04", "note": "STARBUCKS STORE 52015 HERSHEY PA"}, {"id": "seed14", "type": "expense", "category": "UNCATEGORIZED", "amount": 20.0, "date": "2026-07-03", "note": "PARAMOUNTSP PALMYRA PA"}, {"id": "seed15", "type": "expense", "category": "UNCATEGORIZED", "amount": 15.89, "date": "2026-07-03", "note": "ROLLING THUNDER EXPRESS"}, {"id": "seed16", "type": "expense", "category": "UNCATEGORIZED", "amount": 900.0, "date": "2026-07-03", "note": "CASH WITHDRAWAL SOUDER,COLE A"}, {"id": "seed17", "type": "expense", "category": "fastfood", "amount": 19.72, "date": "2026-07-03", "note": "CHIPOTLE 3676 HUMMELSTOWN PA"}, {"id": "seed18", "type": "expense", "category": "fastfood", "amount": 3.71, "date": "2026-07-03", "note": "CHIPOTLE 3676 HUMMELSTOWN PA"}, {"id": "seed19", "type": "income", "category": "Coaching", "amount": 1276.98, "date": "2026-07-03", "note": "KEYSTONE SPORTS"}, {"id": "seed20", "type": "expense", "category": "UNCATEGORIZED", "amount": 74.97, "date": "2026-07-03", "note": "SILLY FARMS WHOLESALE"}, {"id": "seed21", "type": "expense", "category": "fuel", "amount": 41.72, "date": "2026-07-02", "note": "REDNERS QK SHP #6 FUEL PALMYRA PA"}, {"id": "seed22", "type": "expense", "category": "convenience", "amount": 7.94, "date": "2026-07-01", "note": "SUNOCO ELVERSON PA"}, {"id": "seed23", "type": "income", "category": "Coaching", "amount": 175.0, "date": "2026-07-01", "note": "PREMIER DEVELOPM"}, {"id": "seed24", "type": "expense", "category": "UNCATEGORIZED", "amount": 5.5, "date": "2026-07-01", "note": "SQ *HARRISBURG SENATORS"}, {"id": "seed25", "type": "expense", "category": "UNCATEGORIZED", "amount": 29.84, "date": "2026-06-30", "note": "SAMS CLUB #8175 HARRISBURG"}, {"id": "seed26", "type": "expense", "category": "convenience", "amount": 7.86, "date": "2026-06-30", "note": "SUNOCO ELVERSON PA"}, {"id": "seed27", "type": "income", "category": "Other Income", "amount": 30.4, "date": "2026-06-30", "note": "CASH APP*COLE SOUDER*CASH"}, {"id": "seed28", "type": "income", "category": "Other Income", "amount": 551.0, "date": "2026-06-29", "note": "MOBILE DEPOSIT RECEIVED (1 CHECK)"}, {"id": "seed29", "type": "expense", "category": "convenience", "amount": 6.35, "date": "2026-06-29", "note": "TURKEY HILL 0122"}, {"id": "seed30", "type": "expense", "category": "fuel", "amount": 37.84, "date": "2026-06-29", "note": "TURKEY HILL 0122"}, {"id": "seed31", "type": "expense", "category": "bars", "amount": 20.0, "date": "2026-06-29", "note": "TELLUS360 LANCASTER PA"}, {"id": "seed32", "type": "expense", "category": "bars", "amount": 16.0, "date": "2026-06-29", "note": "TELLUS360 LANCASTER PA"}, {"id": "seed33", "type": "expense", "category": "bars", "amount": 16.0, "date": "2026-06-29", "note": "TELLUS360 LANCASTER PA"}, {"id": "seed34", "type": "expense", "category": "bars", "amount": 8.0, "date": "2026-06-29", "note": "TELLUS360 LANCASTER PA"}, {"id": "seed35", "type": "expense", "category": "bars", "amount": 21.6, "date": "2026-06-28", "note": "THE BASEMENT NIGHTSPOT STATE COLLEGE PA"}, {"id": "seed36", "type": "expense", "category": "convenience", "amount": 5.83, "date": "2026-06-28", "note": "TURKEY HILL 0122"}, {"id": "seed37", "type": "expense", "category": "bars", "amount": 12.67, "date": "2026-06-28", "note": "SQ *IRVING'S STATE COLLEGE PA"}, {"id": "seed38", "type": "expense", "category": "bars", "amount": 12.0, "date": "2026-06-28", "note": "TST* SHANDYGAFF STATE COLLEGE PA"}, {"id": "seed39", "type": "expense", "category": "bars", "amount": 15.0, "date": "2026-06-28", "note": "TST* SHANDYGAFF STATE COLLEGE PA"}, {"id": "seed40", "type": "expense", "category": "UNCATEGORIZED", "amount": 22.23, "date": "2026-06-28", "note": "LAUDERMILCH MEATS ANNVILLE PA"}, {"id": "seed41", "type": "expense", "category": "convenience", "amount": 5.51, "date": "2026-06-28", "note": "SHEETZ 0635 STATE COLLEGE PA"}, {"id": "seed42", "type": "expense", "category": "convenience", "amount": 2.54, "date": "2026-06-28", "note": "SHEETZ 0782 LANCASTER PA"}, {"id": "seed43", "type": "expense", "category": "bars", "amount": 7.18, "date": "2026-06-28", "note": "THE PHYRST"}, {"id": "seed44", "type": "expense", "category": "bars", "amount": 9.0, "date": "2026-06-28", "note": "THE PHYRST"}, {"id": "seed45", "type": "expense", "category": "convenience", "amount": 12.71, "date": "2026-06-27", "note": "BP STRAVA SUBSCRIPTION"}, {"id": "seed46", "type": "expense", "category": "UNCATEGORIZED", "amount": 47.55, "date": "2026-06-27", "note": "WALNUT ST MINITMART #232 LEWISTOWN PA"}, {"id": "seed47", "type": "income", "category": "Other Income", "amount": 147.08, "date": "2026-06-27", "note": "CASH APP*COLE SOUDER*CASH"}, {"id": "seed48", "type": "expense", "category": "convenience", "amount": 24.9, "date": "2026-06-27", "note": "SHEETZ 0351 HUMMELSTOWN PA"}, {"id": "seed49", "type": "expense", "category": "UNCATEGORIZED", "amount": 100.0, "date": "2026-06-26", "note": "VENMO"}, {"id": "seed50", "type": "expense", "category": "bars", "amount": 10.0, "date": "2026-06-26", "note": "PNC BANK HUMMELSTOWN PA"}, {"id": "seed51", "type": "expense", "category": "fastfood", "amount": 34.51, "date": "2026-06-26", "note": "TACO BELL 040067 LEBANON PA"}, {"id": "seed52", "type": "expense", "category": "convenience", "amount": 11.86, "date": "2026-06-26", "note": "WAWA 8059 BOOTHWYN PA"}, {"id": "seed53", "type": "expense", "category": "UNCATEGORIZED", "amount": 15.99, "date": "2026-06-25", "note": "REDNERS MKTS #60 PALMYRA PA"}, {"id": "seed54", "type": "expense", "category": "fastfood", "amount": 44.0, "date": "2026-06-25", "note": "HERSHEY PARK FOODS HERSHEY PA"}, {"id": "seed55", "type": "expense", "category": "fastfood", "amount": 32.0, "date": "2026-06-25", "note": "HERSHEY PARK FOODS HERSHEY PA"}, {"id": "seed56", "type": "expense", "category": "convenience", "amount": 18.84, "date": "2026-06-25", "note": "SUNOCO WAYNE PA"}, {"id": "seed57", "type": "expense", "category": "convenience", "amount": 15.39, "date": "2026-06-25", "note": "SPEEDWAY 45793 PALMYRA"}, {"id": "seed58", "type": "expense", "category": "fuel", "amount": 37.66, "date": "2026-06-25", "note": "SPEEDWAY 45793 PALMYRA"}, {"id": "seed59", "type": "expense", "category": "bars", "amount": 25.43, "date": "2026-06-25", "note": "BRASS RAIL BEVERAGE CAMPBELLTOWN PA"}, {"id": "seed60", "type": "expense", "category": "bars", "amount": 73.44, "date": "2026-06-24", "note": "WINE AND SPIRITS 2211 HUMMELSTOWN PA"}, {"id": "seed61", "type": "income", "category": "Coaching", "amount": 85.0, "date": "2026-06-24", "note": "WPSL"}, {"id": "seed62", "type": "expense", "category": "convenience", "amount": 14.42, "date": "2026-06-24", "note": "SHEETZ 0927 LANCASTER PA"}, {"id": "seed63", "type": "expense", "category": "roth", "amount": 100.0, "date": "2026-06-23", "note": "FID BKG SVC LLC"}, {"id": "seed64", "type": "expense", "category": "convenience", "amount": 34.82, "date": "2026-06-23", "note": "TURKEY HILL 0052 GAP PA"}, {"id": "seed65", "type": "income", "category": "Other Income", "amount": 70.0, "date": "2026-06-22", "note": "MOBILE DEPOSIT RECEIVED (1 CHECK)"}, {"id": "seed66", "type": "expense", "category": "UNCATEGORIZED", "amount": 17.0, "date": "2026-06-22", "note": "VENMO"}, {"id": "seed67", "type": "expense", "category": "convenience", "amount": 10.77, "date": "2026-06-22", "note": "SHEETZ 0628 HARRISBURG PA"}, {"id": "seed68", "type": "expense", "category": "bars", "amount": 19.07, "date": "2026-06-22", "note": "WINE AND SPIRITS 2223 HUMMELSTOWN PA"}, {"id": "seed69", "type": "expense", "category": "convenience", "amount": 5.18, "date": "2026-06-22", "note": "TURKEY HILL 0082 GAP NEWPORT PIKE"}, {"id": "seed70", "type": "expense", "category": "bars", "amount": 4.95, "date": "2026-06-21", "note": "AMK SUBARU PARK CONC CHESTER PA"}, {"id": "seed71", "type": "expense", "category": "bars", "amount": 40.37, "date": "2026-06-21", "note": "GARYS BAR LLC PALMYRA PA"}, {"id": "seed72", "type": "expense", "category": "convenience", "amount": 10.05, "date": "2026-06-21", "note": "SHEETZ 0211 PALMYRA PA"}, {"id": "seed73", "type": "expense", "category": "convenience", "amount": 3.45, "date": "2026-06-21", "note": "SUNOCO CHESTER PA"}, {"id": "seed74", "type": "expense", "category": "bars", "amount": 23.3, "date": "2026-06-21", "note": "AMK SUBARU PARK RETAIL CHESTER PA"}, {"id": "seed75", "type": "expense", "category": "UNCATEGORIZED", "amount": 20.0, "date": "2026-06-20", "note": "DK*DRAFTKINGST39G"}, {"id": "seed76", "type": "expense", "category": "bars", "amount": 79.99, "date": "2026-06-20", "note": "BOOT BARN #382 HARRISBURG PA"}, {"id": "seed77", "type": "expense", "category": "fuel", "amount": 44.51, "date": "2026-06-20", "note": "SPEEDWAY 45794 MANHEIM PA"}, {"id": "seed78", "type": "expense", "category": "UNCATEGORIZED", "amount": 12.96, "date": "2026-06-20", "note": "SQ *ENDLESS CONSULTING PHILADELPHIA PA"}, {"id": "seed79", "type": "expense", "category": "UNCATEGORIZED", "amount": 6.48, "date": "2026-06-19", "note": "SQ *ENDLESS CONSULTING PHILADELPHIA PA"}, {"id": "seed80", "type": "expense", "category": "bars", "amount": 22.4, "date": "2026-06-19", "note": "GARYS BAR LLC PALMYRA PA"}, {"id": "seed81", "type": "expense", "category": "fuel", "amount": 42.96, "date": "2026-06-18", "note": "SUNOCO READING PA"}, {"id": "seed82", "type": "expense", "category": "convenience", "amount": 3.91, "date": "2026-06-18", "note": "TURKEY HILL 0244"}, {"id": "seed83", "type": "income", "category": "Coaching", "amount": 468.44, "date": "2026-06-18", "note": "KEYSTONE SPORTS"}, {"id": "seed84", "type": "expense", "category": "convenience", "amount": 17.94, "date": "2026-06-17", "note": "TURKEY HILL 0197 PALMYRA PA"}, {"id": "seed85", "type": "expense", "category": "UNCATEGORIZED", "amount": 318.0, "date": "2026-06-17", "note": "TRANSFER TO KARINA M SOUDER"}, {"id": "seed86", "type": "expense", "category": "convenience", "amount": 3.81, "date": "2026-06-17", "note": "TURKEY HILL 0073"}, {"id": "seed87", "type": "expense", "category": "convenience", "amount": 3.07, "date": "2026-06-17", "note": "WAWA 8061 NORRISTOWN PA"}, {"id": "seed88", "type": "expense", "category": "fuel", "amount": 43.22, "date": "2026-06-16", "note": "SPEEDWAY 45794 MANHEIM PA"}, {"id": "seed89", "type": "income", "category": "Coaching", "amount": 120.0, "date": "2026-06-16", "note": "NPSL"}, {"id": "seed90", "type": "expense", "category": "convenience", "amount": 3.91, "date": "2026-06-16", "note": "TURKEY HILL 0122"}, {"id": "seed91", "type": "expense", "category": "UNCATEGORIZED", "amount": 2.5, "date": "2026-06-15", "note": "CTLP*CANTEEN VENDING CHARLOTTE NC"}, {"id": "seed92", "type": "expense", "category": "convenience", "amount": 4.23, "date": "2026-06-15", "note": "LOVE'S #0358 INSIDE HAMBURG PA"}, {"id": "seed93", "type": "expense", "category": "convenience", "amount": 16.0, "date": "2026-06-15", "note": "BLOOMSBURY CITGO #1 NJ"}, {"id": "seed94", "type": "expense", "category": "fastfood", "amount": 4.42, "date": "2026-06-15", "note": "BURGER KING #31222 WALLKILL NY"}, {"id": "seed95", "type": "expense", "category": "fastfood", "amount": 14.22, "date": "2026-06-15", "note": "WENDY'S GLENS FALLS QUEENSBURY NY"}, {"id": "seed96", "type": "income", "category": "Coaching", "amount": 85.0, "date": "2026-06-15", "note": "USL ACADEMY, LLC"}, {"id": "seed97", "type": "income", "category": "Other Income", "amount": 40.0, "date": "2026-06-15", "note": "VENMO"}, {"id": "seed98", "type": "expense", "category": "convenience", "amount": 15.58, "date": "2026-06-14", "note": "USHERS ROAD XTRA FUELS CLIFTON PARK NY"}, {"id": "seed99", "type": "expense", "category": "fuel", "amount": 37.9, "date": "2026-06-14", "note": "LOVE'S #0358 OUTSIDE HAMBURG PA"}, {"id": "seed100", "type": "expense", "category": "convenience", "amount": 9.51, "date": "2026-06-14", "note": "SPEEDWAY 45043 FORT EDWARD"}, {"id": "seed101", "type": "expense", "category": "cannabis", "amount": 53.5, "date": "2026-06-14", "note": "PAI ATM VERGENNES VT"}, {"id": "seed102", "type": "expense", "category": "fuel", "amount": 41.95, "date": "2026-06-14", "note": "COSTCO GAS #0314 COLCHESTER VT"}, {"id": "seed103", "type": "expense", "category": "fastfood", "amount": 4.47, "date": "2026-06-14", "note": "ALS FRENCH FRYS SOUTH BURLINGTON VT"}, {"id": "seed104", "type": "expense", "category": "UNCATEGORIZED", "amount": 14.16, "date": "2026-06-14", "note": "SIMON'S COLLEGE PARKWAY"}, {"id": "seed105", "type": "expense", "category": "convenience", "amount": 10.48, "date": "2026-06-14", "note": "CUMBERLAND FARMS 8028"}, {"id": "seed106", "type": "expense", "category": "fastfood", "amount": 41.36, "date": "2026-06-14", "note": "TEXAS ROADHOUSE #2324 WILLISTON VT"}, {"id": "seed107", "type": "expense", "category": "fuel", "amount": 37.14, "date": "2026-06-13", "note": "SUNOCO E BRUNSWICK NJ"}, {"id": "seed108", "type": "expense", "category": "convenience", "amount": 13.67, "date": "2026-06-13", "note": "CUMBERLAND FARMS 8028"}, {"id": "seed109", "type": "expense", "category": "UNCATEGORIZED", "amount": 3.86, "date": "2026-06-13", "note": "WALGREENS ESSEX JUNCTION VT"}, {"id": "seed110", "type": "expense", "category": "convenience", "amount": 19.48, "date": "2026-06-13", "note": "AG TRAVEL PLAZA WALLKILL NY"}, {"id": "seed111", "type": "expense", "category": "convenience", "amount": 19.84, "date": "2026-06-12", "note": "SUNOCO E BRUNSWICK NJ"}, {"id": "seed112", "type": "income", "category": "Coaching", "amount": 520.0, "date": "2026-06-12", "note": "GOTSOCCER"}, {"id": "seed113", "type": "expense", "category": "bars", "amount": 27.72, "date": "2026-06-11", "note": "GARYS BAR LLC PALMYRA PA"}, {"id": "seed114", "type": "income", "category": "Other Income", "amount": 265.0, "date": "2026-06-11", "note": "MOBILE DEPOSIT RECEIVED (1 CHECK)"}, {"id": "seed115", "type": "expense", "category": "convenience", "amount": 6.64, "date": "2026-06-10", "note": "SHEETZ 2211 PALMYRA PA"}, {"id": "seed116", "type": "expense", "category": "fuel", "amount": 37.12, "date": "2026-06-10", "note": "SHEETZ 2312 MT JOY PA"}, {"id": "seed117", "type": "expense", "category": "convenience", "amount": 5.83, "date": "2026-06-10", "note": "SHEETZ 0312 MT JOY PA"}, {"id": "seed118", "type": "expense", "category": "fastfood", "amount": 5.5, "date": "2026-06-09", "note": "DAIRY QUEEN #41397 PALMYRA PA"}, {"id": "seed119", "type": "expense", "category": "convenience", "amount": 3.92, "date": "2026-06-09", "note": "WAWA 8166 WOODLYN RIDLEY PA"}, {"id": "seed120", "type": "expense", "category": "convenience", "amount": 10.68, "date": "2026-06-09", "note": "WAWA 842 HOCKESSIN DE"}, {"id": "seed121", "type": "expense", "category": "UNCATEGORIZED", "amount": 39.17, "date": "2026-06-09", "note": "SP WETHEPEOPLEHOLSTE NV"}, {"id": "seed122", "type": "expense", "category": "UNCATEGORIZED", "amount": 50.0, "date": "2026-06-08", "note": "VENMO"}, {"id": "seed123", "type": "expense", "category": "cannabis", "amount": 123.25, "date": "2026-06-08", "note": "EFT PENNS GROVE NJ"}, {"id": "seed124", "type": "expense", "category": "UNCATEGORIZED", "amount": 200.0, "date": "2026-06-08", "note": "TRANSFER TO KARINA M SOUDER"}, {"id": "seed125", "type": "expense", "category": "fastfood", "amount": 3.7, "date": "2026-06-08", "note": "ARBYS 1172 CAMP HILL PA"}, {"id": "seed126", "type": "income", "category": "Coaching", "amount": 575.0, "date": "2026-06-08", "note": "3 STEP SPORTS LL"}, {"id": "seed127", "type": "income", "category": "Other Income", "amount": 40.0, "date": "2026-06-08", "note": "VENMO"}, {"id": "seed128", "type": "expense", "category": "bars", "amount": 11.0, "date": "2026-06-07", "note": "GARYS BAR LLC PALMYRA PA"}, {"id": "seed129", "type": "expense", "category": "bars", "amount": 19.77, "date": "2026-06-07", "note": "GARYS BAR LLC PALMYRA PA"}, {"id": "seed130", "type": "expense", "category": "convenience", "amount": 9.62, "date": "2026-06-07", "note": "WAWA 258 SPRING CITY PA"}, {"id": "seed131", "type": "expense", "category": "fastfood", "amount": 10.98, "date": "2026-06-07", "note": "CHIPOTLE 2103 HERSHEY PA"}, {"id": "seed132", "type": "expense", "category": "UNCATEGORIZED", "amount": 42.16, "date": "2026-06-06", "note": "SAMS CLUB #8175 HARRISBURG"}, {"id": "seed133", "type": "expense", "category": "fuel", "amount": 40.67, "date": "2026-06-06", "note": "SHEETZ 2211 PALMYRA PA"}, {"id": "seed134", "type": "expense", "category": "convenience", "amount": 3.07, "date": "2026-06-06", "note": "WAWA 245 DOWNINGTOWN PA"}, {"id": "seed135", "type": "expense", "category": "convenience", "amount": 13.15, "date": "2026-06-06", "note": "TURKEY HILL 0122"}, {"id": "seed136", "type": "expense", "category": "convenience", "amount": 7.94, "date": "2026-06-05", "note": "SUNOCO ELVERSON PA"}, {"id": "seed137", "type": "expense", "category": "UNCATEGORIZED", "amount": 15.9, "date": "2026-06-04", "note": "TIKTOK SHOP"}, {"id": "seed138", "type": "income", "category": "Coaching", "amount": 85.0, "date": "2026-06-04", "note": "UNITED PREMIER S"}, {"id": "seed139", "type": "income", "category": "Other Income", "amount": 30.01, "date": "2026-06-04", "note": "COLE SOUDER"}, {"id": "seed140", "type": "expense", "category": "UNCATEGORIZED", "amount": 5.0, "date": "2026-06-03", "note": "CASH APP*COLE SOUDER*ADD"}, {"id": "seed141", "type": "expense", "category": "UNCATEGORIZED", "amount": 30.0, "date": "2026-06-03", "note": "CASH APP*COLE SOUDER*ADD"}, {"id": "seed142", "type": "income", "category": "Other Income", "amount": 50.0, "date": "2026-06-03", "note": "VENMO"}, {"id": "seed143", "type": "expense", "category": "UNCATEGORIZED", "amount": 45.81, "date": "2026-06-02", "note": "WAL-MART #2888"}, {"id": "seed144", "type": "expense", "category": "UNCATEGORIZED", "amount": 50.0, "date": "2026-06-02", "note": "VENMO"}, {"id": "seed145", "type": "expense", "category": "UNCATEGORIZED", "amount": 16.98, "date": "2026-06-02", "note": "REDNERS MKTS #60 PALMYRA PA"}, {"id": "seed146", "type": "expense", "category": "UNCATEGORIZED", "amount": 20.0, "date": "2026-06-01", "note": "PARAMOUNTSP PALMYRA PA"}, {"id": "seed147", "type": "expense", "category": "convenience", "amount": 8.4, "date": "2026-06-01", "note": "SHEETZ 0211 PALMYRA PA"}, {"id": "seed148", "type": "expense", "category": "convenience", "amount": 14.39, "date": "2026-06-01", "note": "WAWA 8109 READING PA"}, {"id": "seed149", "type": "income", "category": "Other Income", "amount": 118.0, "date": "2026-06-01", "note": "PROVISIONAL CREDIT CLAIM"}, {"id": "seed150", "type": "expense", "category": "UNCATEGORIZED", "amount": 35.0, "date": "2026-06-01", "note": "CASH APP*COLE SOUDER*ADD"}];
+
+// Auto-categorization rules, checked in order. Gas vendors use an amount threshold
+// (>=$35 = Fuel fill-up, under = Gas Station Convenience), matching how you actually spend.
+const GAS_VENDORS = ['sheetz','sunoco','speedway','turkey hill','wawa',"love's",'loves','costco gas','cumberland farms','ushers road','ag travel','redners qk','citgo','exxon','shell','bp ','getgo','rutters','gas station','fuel'];
+const BAR_KEYWORDS = ['bar','pub','tavern','brewery','brewing','lounge','nightclub','saloon','tellus','phyrst','shandygaff','wine and spirits','liquor','beer','basement nightspot',"irving's"];
+const FASTFOOD_KEYWORDS = ['chipotle','taco bell','mcdonald','wendy','burger king','arby','dairy queen','kfc','subway','starbucks','dunkin','pizza','chick-fil-a','texas roadhouse'];
+const SUBSCRIPTION_KEYWORDS = ['strava','netflix','spotify','hulu','subscription','prime video','disney+'];
+const CANNABIS_KEYWORDS = ['cannabis','dispensary','weed'];
+
+function autoDetectCategory(note, amount){
+  const n = note.toLowerCase();
+  if(!n) return null;
+  if(GAS_VENDORS.some(k=>n.includes(k))){
+    return (amount && amount>=35) ? 'fuel' : 'convenience';
+  }
+  if(BAR_KEYWORDS.some(k=>n.includes(k))) return 'bars';
+  if(FASTFOOD_KEYWORDS.some(k=>n.includes(k))) return 'fastfood';
+  if(SUBSCRIPTION_KEYWORDS.some(k=>n.includes(k))) return 'subs';
+  if(CANNABIS_KEYWORDS.some(k=>n.includes(k))) return 'cannabis';
+  return null;
+}
+
+let state = {
+  transactions: [], // {id, type:'income'|'expense', category(id for expense, name for income), amount, date, note}
+  categories: [],   // {id, name, goal}
+  savings: [],      // {id, type:'deposit'|'dividend'|'withdrawal', amount, date, note}
+  savingsApy: 0.22,
+};
+
+const SEED_SAVINGS = [
+  {id:'sv1', type:'deposit', amount:58.66, date:'2026-06-17', note:'Starting balance (from statement)'},
+  {id:'sv2', type:'deposit', amount:117.11, date:'2026-06-18', note:'Keystone Sports'},
+  {id:'sv3', type:'dividend', amount:0.02, date:'2026-06-30', note:'Dividend, 0.22% APY earned'},
+  {id:'sv4', type:'deposit', amount:319.24, date:'2026-07-03', note:'Keystone Sports'},
+];
+
+let viewMonth = new Date().getMonth();
+let viewYear = new Date().getFullYear();
+let pieChartInstance = null;
+let barChartInstance = null;
+
+function fmt(n){
+  const neg = n < 0;
+  const v = Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:0, maximumFractionDigits:0});
+  return (neg?'-':'') + '$' + v;
+}
+function fmtDec(n){ return '$' + Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1600);
+}
+function monthLabel(y,m){
+  const names=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  return names[m]+' '+y;
+}
+function shortMonthLabel(y,m){
+  const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[m]+" '"+String(y).slice(2);
+}
+function inMonth(dateStr,y,m){
+  const d = new Date(dateStr+'T00:00:00');
+  return d.getFullYear()===y && d.getMonth()===m;
+}
+function inViewMonth(dateStr){ return inMonth(dateStr, viewYear, viewMonth); }
+
+async function loadState(){
+  try{
+    const tx = localStorage.getItem('mb-transactions');
+    state.transactions = tx ? JSON.parse(tx) : null;
+  }catch(e){ state.transactions = null; }
+  try{
+    const cats = localStorage.getItem('mb-categories');
+    state.categories = cats ? JSON.parse(cats) : DEFAULT_CATS.slice();
+  }catch(e){ state.categories = DEFAULT_CATS.slice(); }
+  try{
+    const sv = localStorage.getItem('mb-savings');
+    state.savings = sv ? JSON.parse(sv) : null;
+  }catch(e){ state.savings = null; }
+  try{
+    const apy = localStorage.getItem('mb-savings-apy');
+    if(apy) state.savingsApy = parseFloat(apy);
+  }catch(e){}
+
+  const seededFlag = localStorage.getItem('mb-seeded-history-v1');
+
+  if(state.transactions === null){
+    if(!seededFlag){
+      // First time ever opening the app: pre-load transaction history
+      state.transactions = SEED_TRANSACTIONS.slice();
+      let uncategorized = state.categories.find(c=>c.name.toLowerCase()==='uncategorized');
+      if(!uncategorized){
+        uncategorized = {id:'uncategorized', name:'Uncategorized', goal:0};
+        state.categories.push(uncategorized);
+      }
+      state.transactions.forEach(t=>{ if(t.category==='UNCATEGORIZED') t.category = uncategorized.id; });
+      await saveTransactions();
+      await saveCategories();
+      localStorage.setItem('mb-seeded-history-v1', 'true');
+      showToast('Loaded your transaction history');
+    } else {
+      state.transactions = [];
+    }
+  }
+
+  if(state.savings === null){
+    if(!seededFlag){
+      state.savings = SEED_SAVINGS.slice();
+      await saveSavings();
+    } else {
+      state.savings = [];
+    }
+  }
+
+  render();
+}
+async function saveTransactions(){
+  try{ localStorage.setItem('mb-transactions', JSON.stringify(state.transactions)); }
+  catch(e){ console.error(e); showToast('Save failed, storage may be full'); }
+}
+async function saveCategories(){
+  try{ localStorage.setItem('mb-categories', JSON.stringify(state.categories)); }
+  catch(e){ console.error(e); showToast('Save failed, storage may be full'); }
+}
+async function saveSavings(){
+  try{ localStorage.setItem('mb-savings', JSON.stringify(state.savings)); }
+  catch(e){ console.error(e); showToast('Save failed, storage may be full'); }
+}
+
+function computeIncomeThisMonth(){
+  return state.transactions.filter(t=>t.type==='income' && inViewMonth(t.date)).reduce((s,t)=>s+t.amount,0);
+}
+function computeSpentThisMonth(){
+  return state.transactions.filter(t=>t.type==='expense' && inViewMonth(t.date)).reduce((s,t)=>s+t.amount,0);
+}
+function computeSpentByCatThisMonth(catId){
+  return state.transactions.filter(t=>t.type==='expense' && t.category===catId && inViewMonth(t.date)).reduce((s,t)=>s+t.amount,0);
+}
+function computeAllTimeNet(){
+  const inc = state.transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = state.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  return inc-exp;
+}
+function computeSavingsBalance(){
+  return state.savings.reduce((bal,s)=>{
+    if(s.type==='withdrawal') return bal - s.amount;
+    return bal + s.amount;
+  }, 0);
+}
+
+function render(){
+  document.getElementById('monthLabel').textContent = monthLabel(viewYear, viewMonth);
+
+  const incomeSoFar = computeIncomeThisMonth();
+  const spent = computeSpentThisMonth();
+  const net = incomeSoFar - spent;
+
+  document.getElementById('incomeSoFar').textContent = fmt(incomeSoFar);
+  document.getElementById('spentSoFar').textContent = fmt(spent);
+  document.getElementById('allTimeNet').textContent = fmt(computeAllTimeNet());
+  const netEl = document.getElementById('netTotal');
+  netEl.textContent = fmt(net);
+  netEl.classList.toggle('negative', net<0);
+
+  const catWrap = document.getElementById('catList');
+  catWrap.innerHTML = '';
+  if(state.categories.length===0){
+    catWrap.innerHTML = '<div class="empty">No spending categories yet. Tap "Edit goals" to add some.</div>';
+  }
+  state.categories.forEach(cat=>{
+    const spentCat = computeSpentByCatThisMonth(cat.id);
+    const pct = cat.goal > 0 ? Math.min(100,(spentCat/cat.goal)*100) : (spentCat>0?100:0);
+    const over = cat.goal > 0 ? spentCat > cat.goal : spentCat > 0;
+    const close = !over && pct >= 80;
+    const remain = cat.goal - spentCat;
+    const div = document.createElement('div');
+    div.className = 'card cat-card';
+    div.innerHTML = `
+      <div class="cat-top">
+        <span class="cat-name">${cat.name}</span>
+        <span class="cat-nums"><strong>${fmt(spentCat)}</strong> / ${fmt(cat.goal)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${over?'over':(close?'close':'')}" style="width:${pct}%"></div></div>
+      <div class="cat-remain ${over?'over-text':''}">${over ? fmt(Math.abs(remain))+' over goal' : fmt(remain)+' left this month'}</div>
+    `;
+    catWrap.appendChild(div);
+  });
+
+  const logWrap = document.getElementById('logList');
+  const monthTx = state.transactions.filter(t=>inViewMonth(t.date)).sort((a,b)=> b.date.localeCompare(a.date));
+  if(monthTx.length===0){
+    logWrap.innerHTML = '<div class="empty">No transactions logged for this month yet.</div>';
+  }else{
+    logWrap.innerHTML = '';
+    monthTx.forEach(t=>{
+      const catLabel = t.type==='income' ? t.category : (state.categories.find(c=>c.id===t.category)?.name || t.category);
+      const row = document.createElement('div');
+      row.className = 'log-item';
+      row.innerHTML = `
+        <div class="log-row">
+          <div class="log-left">
+            <span class="log-cat">${catLabel}</span>
+            <span class="log-meta">${t.date}${t.note ? ' · '+t.note : ''}</span>
+          </div>
+          <div style="display:flex; align-items:center;">
+            <span class="log-amt ${t.type==='income'?'pos':'neg'}">${t.type==='income'?'+':'-'}${fmtDec(t.amount)}</span>
+            <button class="del-btn" data-id="${t.id}">✕</button>
+          </div>
+        </div>
+      `;
+      logWrap.appendChild(row);
+    });
+  }
+
+  renderCharts();
+  renderSavings();
+}
+
+function renderSavings(){
+  const balance = computeSavingsBalance();
+  document.getElementById('savingsBalance').textContent = fmt(balance);
+  document.getElementById('savingsApyLine').textContent = state.savingsApy + '% APY';
+
+  const wrap = document.getElementById('savingsList');
+  const sorted = [...state.savings].sort((a,b)=> b.date.localeCompare(a.date));
+  if(sorted.length===0){
+    wrap.innerHTML = '<div class="empty">No savings activity logged yet.</div>';
+    return;
+  }
+  // compute running balance for display, oldest first, then reverse for display
+  const chronological = [...state.savings].sort((a,b)=> a.date.localeCompare(b.date));
+  let running = 0;
+  const withBalance = chronological.map(s=>{
+    running += (s.type==='withdrawal' ? -s.amount : s.amount);
+    return {...s, balanceAfter: running};
+  });
+  withBalance.reverse();
+
+  wrap.innerHTML = '';
+  withBalance.forEach(s=>{
+    const label = s.type==='deposit' ? 'Deposit' : s.type==='dividend' ? 'Dividend' : 'Withdrawal';
+    const sign = s.type==='withdrawal' ? '-' : '+';
+    const row = document.createElement('div');
+    row.className = 'log-item';
+    row.innerHTML = `
+      <div class="log-row">
+        <div class="log-left">
+          <span class="log-cat">${label}${s.note ? ' · '+s.note : ''}</span>
+          <span class="log-meta">${s.date} · balance ${fmt(s.balanceAfter)}</span>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <span class="log-amt ${s.type==='withdrawal'?'neg':'pos'}">${sign}${fmtDec(s.amount)}</span>
+          <button class="del-btn" data-svid="${s.id}">✕</button>
+        </div>
+      </div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+document.getElementById('savingsList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-svid]');
+  if(!btn) return;
+  state.savings = state.savings.filter(s=>s.id!==btn.dataset.svid);
+  await saveSavings();
+  renderSavings();
+  showToast('Deleted');
+});
+
+function renderCharts(){
+  // Pie: spending by category, this month
+  const pieLabels = [];
+  const pieData = [];
+  state.categories.forEach(cat=>{
+    const v = computeSpentByCatThisMonth(cat.id);
+    if(v>0){ pieLabels.push(cat.name); pieData.push(v); }
+  });
+  // include any "other"/custom income-typed categories spent as expense with unmatched ids (shouldn't happen, but safety net)
+  const pieCanvas = document.getElementById('pieChart');
+  const pieEmpty = document.getElementById('pieEmpty');
+  if(pieData.length===0){
+    pieEmpty.style.display = 'block';
+    pieCanvas.style.display = 'none';
+  }else{
+    pieEmpty.style.display = 'none';
+    pieCanvas.style.display = 'block';
+    const palette = ['#1b4332','#2d6a4f','#74a58b','#e0a94a','#c1443c','#5b6660','#8d99ae','#b08968','#4a5759','#9c6644'];
+    if(pieChartInstance) pieChartInstance.destroy();
+    pieChartInstance = new Chart(pieCanvas, {
+      type:'doughnut',
+      data:{ labels: pieLabels, datasets:[{ data: pieData, backgroundColor: palette, borderWidth:2, borderColor:'#faf8f3' }] },
+      options:{
+        plugins:{ legend:{ position:'bottom', labels:{ font:{family:"'Inter',sans-serif", size:11}, boxWidth:12, padding:12 } } },
+        cutout:'58%'
+      }
+    });
+  }
+
+  // Bar: last 6 months income vs expense, ending at viewed month
+  const months = [];
+  for(let i=5;i>=0;i--){
+    let m = viewMonth - i, y = viewYear;
+    while(m<0){ m+=12; y--; }
+    months.push({y,m});
+  }
+  const incomeSeries = months.map(({y,m}) => state.transactions.filter(t=>t.type==='income' && inMonth(t.date,y,m)).reduce((s,t)=>s+t.amount,0));
+  const expenseSeries = months.map(({y,m}) => state.transactions.filter(t=>t.type==='expense' && inMonth(t.date,y,m)).reduce((s,t)=>s+t.amount,0));
+  const barLabels = months.map(({y,m})=>shortMonthLabel(y,m));
+
+  const barCanvas = document.getElementById('barChart');
+  if(barChartInstance) barChartInstance.destroy();
+  barChartInstance = new Chart(barCanvas, {
+    type:'bar',
+    data:{
+      labels: barLabels,
+      datasets:[
+        { label:'Income', data: incomeSeries, backgroundColor:'#2d6a4f', borderRadius:4 },
+        { label:'Spent', data: expenseSeries, backgroundColor:'#c1443c', borderRadius:4 },
+      ]
+    },
+    options:{
+      plugins:{ legend:{ position:'bottom', labels:{ font:{family:"'Inter',sans-serif", size:11}, boxWidth:12, padding:12 } } },
+      scales:{
+        y:{ ticks:{ callback:(v)=>'$'+v, font:{family:"'Roboto Mono',monospace", size:10} }, grid:{color:'#eef0ea'} },
+        x:{ ticks:{ font:{family:"'Oswald',sans-serif", size:11} }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+document.getElementById('logList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.del-btn');
+  if(!btn) return;
+  state.transactions = state.transactions.filter(t=>t.id!==btn.dataset.id);
+  await saveTransactions();
+  render();
+  showToast('Deleted');
+});
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-overview').style.display = tab.dataset.tab==='overview' ? 'block':'none';
+    document.getElementById('tab-savings').style.display = tab.dataset.tab==='savings' ? 'block':'none';
+    document.getElementById('tab-charts').style.display = tab.dataset.tab==='charts' ? 'block':'none';
+    document.getElementById('tab-log').style.display = tab.dataset.tab==='log' ? 'block':'none';
+    document.getElementById('openAdd').style.display = tab.dataset.tab==='savings' ? 'none':'flex';
+    document.getElementById('openAddSavings').style.display = tab.dataset.tab==='savings' ? 'flex':'none';
+    if(tab.dataset.tab==='charts') renderCharts();
+    if(tab.dataset.tab==='savings') renderSavings();
+  });
+});
+
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  viewMonth--; if(viewMonth<0){viewMonth=11; viewYear--;}
+  render();
+});
+document.getElementById('nextMonth').addEventListener('click', ()=>{
+  viewMonth++; if(viewMonth>11){viewMonth=0; viewYear++;}
+  render();
+});
+document.getElementById('todayBtn').addEventListener('click', ()=>{
+  viewMonth = new Date().getMonth(); viewYear = new Date().getFullYear();
+  render();
+});
+
+// add transaction sheet
+const overlay = document.getElementById('sheetOverlay');
+const catSelect = document.getElementById('catSelect');
+const customCatField = document.getElementById('customCatField');
+const noteInputEl = document.getElementById('noteInput');
+const amtInputEl = document.getElementById('amtInput');
+const autoTag = document.getElementById('autoTag');
+const autoTagText = document.getElementById('autoTagText');
+let currentType = 'expense';
+let userOverrodeCategory = false;
+
+function populateCatSelect(selectId){
+  if(currentType==='expense'){
+    catSelect.innerHTML = state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('') + '<option value="__custom">Other / custom…</option>';
+  }else{
+    catSelect.innerHTML = INCOME_PRESETS.map(p=>`<option value="${p}">${p}</option>`).join('') + '<option value="__custom">Other / custom…</option>';
+  }
+  if(selectId) catSelect.value = selectId;
+  customCatField.style.display = catSelect.value==='__custom' ? 'block' : 'none';
+}
+catSelect.addEventListener('change', ()=>{
+  userOverrodeCategory = true;
+  customCatField.style.display = catSelect.value==='__custom' ? 'block' : 'none';
+});
+
+function tryAutoDetect(){
+  if(currentType!=='expense') { autoTag.classList.remove('show'); return; }
+  const guess = autoDetectCategory(noteInputEl.value, parseFloat(amtInputEl.value));
+  if(guess && state.categories.find(c=>c.id===guess)){
+    if(!userOverrodeCategory){
+      populateCatSelect(guess);
+    }
+    const catName = state.categories.find(c=>c.id===guess).name;
+    autoTagText.textContent = 'Auto-detected: '+catName+' (tap Category to change)';
+    autoTag.classList.add('show');
+  }else{
+    autoTag.classList.remove('show');
+  }
+}
+noteInputEl.addEventListener('input', tryAutoDetect);
+amtInputEl.addEventListener('input', tryAutoDetect);
+
+document.getElementById('openAdd').addEventListener('click', ()=>{
+  currentType = 'expense';
+  userOverrodeCategory = false;
+  document.querySelectorAll('.seg-in').forEach(b=>b.classList.toggle('active', b.dataset.type==='expense'));
+  populateCatSelect();
+  document.getElementById('dateInput').value = todayISO();
+  amtInputEl.value = '';
+  noteInputEl.value = '';
+  document.getElementById('customCatInput').value = '';
+  autoTag.classList.remove('show');
+  overlay.classList.add('open');
+});
+document.getElementById('cancelBtn').addEventListener('click', ()=> overlay.classList.remove('open'));
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) overlay.classList.remove('open'); });
+
+document.querySelectorAll('.seg-in').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    currentType = btn.dataset.type;
+    userOverrodeCategory = false;
+    document.querySelectorAll('.seg-in').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    populateCatSelect();
+    tryAutoDetect();
+  });
+});
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  const amt = parseFloat(amtInputEl.value);
+  if(!amt || amt<=0){ showToast('Enter a valid amount'); return; }
+  const date = document.getElementById('dateInput').value || todayISO();
+  const note = noteInputEl.value.trim();
+  let category = catSelect.value;
+  if(category==='__custom'){
+    const custom = document.getElementById('customCatInput').value.trim();
+    if(!custom){ showToast('Enter a category name'); return; }
+    if(currentType==='expense'){
+      let existing = state.categories.find(c=>c.name.toLowerCase()===custom.toLowerCase());
+      if(!existing){
+        existing = {id: 'c'+Date.now(), name: custom, goal: 0};
+        state.categories.push(existing);
+        await saveCategories();
+      }
+      category = existing.id;
+    }else{
+      category = custom;
+    }
+  }
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    type: currentType, category, amount: amt, date, note
+  };
+  state.transactions.push(tx);
+  await saveTransactions();
+  overlay.classList.remove('open');
+  render();
+  showToast('Saved');
+});
+
+// goals editor
+const goalsOverlay = document.getElementById('goalsOverlay');
+document.getElementById('editGoalsBtn').addEventListener('click', ()=>{
+  renderGoalsEditor();
+  goalsOverlay.classList.add('open');
+});
+goalsOverlay.addEventListener('click', (e)=>{ if(e.target===goalsOverlay) goalsOverlay.classList.remove('open'); });
+
+function renderGoalsEditor(){
+  const wrap = document.getElementById('goalsEditList');
+  wrap.innerHTML = '';
+  state.categories.forEach(cat=>{
+    const row = document.createElement('div');
+    row.className = 'goal-edit-row';
+    row.innerHTML = `
+      <span>${cat.name}</span>
+      <input type="number" step="1" value="${cat.goal}" data-id="${cat.id}">
+      <button class="del-btn" data-delcat="${cat.id}" style="margin-left:6px;">✕</button>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+document.getElementById('goalsEditList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('[data-delcat]');
+  if(!btn) return;
+  if(!confirm('Remove this category? Past transactions in it will stay in your log but show as "Other".')) return;
+  state.categories = state.categories.filter(c=>c.id!==btn.dataset.delcat);
+  await saveCategories();
+  renderGoalsEditor();
+  render();
+});
+
+document.getElementById('addCatBtn').addEventListener('click', async ()=>{
+  const nameInput = document.getElementById('newCatName');
+  const name = nameInput.value.trim();
+  if(!name) return;
+  state.categories.push({id:'c'+Date.now(), name, goal:0});
+  nameInput.value = '';
+  await saveCategories();
+  renderGoalsEditor();
+});
+
+document.getElementById('saveGoalsBtn').addEventListener('click', async ()=>{
+  const inputs = document.querySelectorAll('#goalsEditList input[data-id]');
+  inputs.forEach(inp=>{
+    const cat = state.categories.find(c=>c.id===inp.dataset.id);
+    if(cat) cat.goal = parseFloat(inp.value) || 0;
+  });
+  await saveCategories();
+  goalsOverlay.classList.remove('open');
+  render();
+  showToast('Goals updated');
+});
+
+document.getElementById('resetLink').addEventListener('click', async ()=>{
+  if(!confirm('Clear ALL logged transactions? Categories/goals will stay. This cannot be undone.')) return;
+  state.transactions = [];
+  await saveTransactions();
+  render();
+  showToast('Reset complete');
+});
+
+// ---- Statement Import ----
+const importOverlay = document.getElementById('importOverlay');
+const importText = document.getElementById('importText');
+const importPreview = document.getElementById('importPreview');
+const parseImportBtn = document.getElementById('parseImportBtn');
+const confirmImportBtn = document.getElementById('confirmImportBtn');
+let pendingImport = [];
+
+document.getElementById('openImport').addEventListener('click', ()=>{
+  importText.value = '';
+  importPreview.textContent = '';
+  confirmImportBtn.style.display = 'none';
+  pendingImport = [];
+  importOverlay.classList.add('open');
+});
+document.getElementById('cancelImportBtn').addEventListener('click', ()=> importOverlay.classList.remove('open'));
+importOverlay.addEventListener('click', (e)=>{ if(e.target===importOverlay) importOverlay.classList.remove('open'); });
+
+function parseStatement(raw){
+  const lines = raw.split('\n').map(l=>l.trim());
+  const dateRe = /^\d{2}\/\d{2}\/\d{4}$/;
+  const amtRe = /^-?\$?[\d,]+\.\d{2}$/;
+  const skipWords = ['pending','posted','no pending'];
+  const results = [];
+  let i = 0;
+  while(i < lines.length){
+    const line = lines[i];
+    if(!line || skipWords.includes(line.toLowerCase())){ i++; continue; }
+    if(dateRe.test(line)){
+      const dateParts = line.split('/');
+      const isoDate = `${dateParts[2]}-${dateParts[0]}-${dateParts[1]}`;
+      let desc = '';
+      let j = i+1;
+      while(j<lines.length && !amtRe.test(lines[j]) && !dateRe.test(lines[j])){
+        desc += (desc? ' ':'') + lines[j];
+        j++;
+      }
+      if(j<lines.length && amtRe.test(lines[j])){
+        const amtStr = lines[j].replace(/\$/g,'').replace(/,/g,'');
+        const amt = parseFloat(amtStr);
+        results.push({ date: isoDate, desc: desc.trim(), amount: amt });
+        j++;
+        // skip an optional trailing running-balance line (positive $ amount, no sign, followed by non-date/non-amount or another date)
+        if(j<lines.length && /^\$?[\d,]+\.\d{2}$/.test(lines[j]) && !dateRe.test(lines[j])){
+          j++;
+        }
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return results;
+}
+
+parseImportBtn.addEventListener('click', ()=>{
+  const parsed = parseStatement(importText.value);
+  if(parsed.length===0){
+    importPreview.textContent = 'No transactions found. Check the format and try again.';
+    confirmImportBtn.style.display = 'none';
+    return;
+  }
+  pendingImport = parsed.map(p=>{
+    const type = p.amount < 0 ? 'expense' : 'income';
+    const absAmt = Math.abs(p.amount);
+    let category;
+    if(type==='expense'){
+      const guess = autoDetectCategory(p.desc, absAmt);
+      if(guess && state.categories.find(c=>c.id===guess)){
+        category = guess;
+      } else {
+        let uncategorized = state.categories.find(c=>c.name.toLowerCase()==='uncategorized');
+        if(!uncategorized){
+          uncategorized = {id:'c'+Date.now()+Math.random().toString(36).slice(2,5), name:'Uncategorized', goal:0};
+          state.categories.push(uncategorized);
+        }
+        category = uncategorized.id;
+      }
+    } else {
+      category = 'Other Income';
+    }
+    return { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), type, category, amount: absAmt, date: p.date, note: p.desc };
+  });
+  const incomeCount = pendingImport.filter(t=>t.type==='income').length;
+  const expenseCount = pendingImport.filter(t=>t.type==='expense').length;
+  importPreview.textContent = `Found ${pendingImport.length} transactions (${incomeCount} income, ${expenseCount} expense). Categories auto-detected where possible, review after import in the Log tab.`;
+  confirmImportBtn.style.display = 'block';
+});
+
+confirmImportBtn.addEventListener('click', async ()=>{
+  state.transactions = state.transactions.concat(pendingImport);
+  await saveTransactions();
+  await saveCategories();
+  importOverlay.classList.remove('open');
+  render();
+  showToast(`Imported ${pendingImport.length} transactions`);
+});
+
+// ---- Savings Entry ----
+const savingsOverlay = document.getElementById('savingsOverlay');
+let currentSvType = 'deposit';
+
+document.getElementById('openAddSavings').addEventListener('click', ()=>{
+  currentSvType = 'deposit';
+  document.querySelectorAll('.seg-sv').forEach(b=>b.classList.toggle('active', b.dataset.type==='deposit'));
+  document.getElementById('svAmtInput').value = '';
+  document.getElementById('svNoteInput').value = '';
+  document.getElementById('svDateInput').value = todayISO();
+  savingsOverlay.classList.add('open');
+});
+document.getElementById('svCancelBtn').addEventListener('click', ()=> savingsOverlay.classList.remove('open'));
+savingsOverlay.addEventListener('click', (e)=>{ if(e.target===savingsOverlay) savingsOverlay.classList.remove('open'); });
+
+document.querySelectorAll('.seg-sv').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    currentSvType = btn.dataset.type;
+    document.querySelectorAll('.seg-sv').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+document.getElementById('svSaveBtn').addEventListener('click', async ()=>{
+  const amt = parseFloat(document.getElementById('svAmtInput').value);
+  if(!amt || amt<=0){ showToast('Enter a valid amount'); return; }
+  const date = document.getElementById('svDateInput').value || todayISO();
+  const note = document.getElementById('svNoteInput').value.trim();
+  state.savings.push({
+    id: 'sv'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    type: currentSvType, amount: amt, date, note
+  });
+  await saveSavings();
+  savingsOverlay.classList.remove('open');
+  renderSavings();
+  showToast('Saved');
+});
+
+loadState();
+</script>
+</body>
+</html>
