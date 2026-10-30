@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cash Flow</title>
+<meta name="description" content="A simple cash flow tracker. Log what you earn and what you spend, see where it goes each month.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* colors pulled from an old ledger notebook vibe. green = in, rust = out */
+  :root {
+    --paper: #f6f3ec;
+    --card: #fffdf8;
+    --ink: #22201c;
+    --muted: #77716a;
+    --line: #e2dccf;
+    --in: #2f6b4f;
+    --out: #a2482b;
+    --flag: #c98a1b;
+    --bar: #d8d1c2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #191816;
+      --card: #22201d;
+      --ink: #ece7dd;
+      --muted: #9a938a;
+      --line: #36332e;
+      --in: #6fb48f;
+      --out: #e0805f;
+      --flag: #e2a83d;
+      --bar: #3c3832;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.45 "IBM Plex Sans", system-ui, sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+  .num, .amt { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+
+  /* ---- quick log ---- */
+  .log { margin-top: 18px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+  .seg button { font: inherit; font-size: 14px; font-weight: 500; padding: 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+  .seg button.on[data-k="out"] { background: var(--out); color: #fff; }
+  .seg button.on[data-k="in"]  { background: var(--in);  color: #fff; }
+  .logrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .logrow .full { grid-column: 1 / -1; }
+  @media (min-width: 560px) { .logrow { grid-template-columns: 120px 1fr 1fr 140px; } .logrow .full { grid-column: auto; } }
+  .amtbox { position: relative; }
+  .amtbox span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+  .amtbox input { padding-left: 22px; width: 100%; }
+
+  input, select {
+    font: inherit; font-size: 15px; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; width: 100%;
+  }
+  .plain {
+    font: inherit; font-size: 14px; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; display: inline-block;
+  }
+  .go { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 500; }
+  .logged { font-size: 13px; color: var(--in); margin: 8px 2px 0; min-height: 18px; }
+
+  /* ---- month view ---- */
+  .monthbar { display: flex; align-items: center; justify-content: space-between; margin: 26px 0 12px; }
+  .monthbar button {
+    background: none; border: 1px solid var(--line); color: var(--ink);
+    width: 36px; height: 36px; border-radius: 8px; font-size: 18px; cursor: pointer;
+  }
+  .monthbar button:disabled { opacity: .3; cursor: default; }
+  #monthLabel { font-weight: 600; font-size: 17px; }
+
+  .totals { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  @media (min-width: 560px) { .totals { grid-template-columns: repeat(4, 1fr); } }
+  .tot { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .tot span { display: block; font-size: 12px; color: var(--muted); }
+  .tot b { font-size: 19px; font-weight: 600; }
+  .pos { color: var(--in); } .neg { color: var(--out); } .warn { color: var(--flag); }
+
+  section { margin-top: 28px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+
+  .rows { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; }
+  .row { padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row .top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+  .track { height: 6px; background: var(--bar); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 3px; }
+  .tag { font-size: 11px; color: var(--flag); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; }
+  .note { font-size: 13px; color: var(--muted); margin: 8px 2px 0; }
+  .empty { padding: 14px 0; color: var(--muted); font-size: 14px; }
+
+  #trend { width: 100%; height: 150px; display: block; }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .tools input { flex: 1 1 160px; width: auto; }
+  .tools select { width: auto; }
+
+  .tx { background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .tx ul { margin: 0; padding: 0; }
+  .tx li { list-style: none; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .tx li:last-child { border-bottom: 0; }
+  .tx .desc { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx .meta { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .tx select { font-size: 12px; color: var(--muted); background: transparent; border: 0; padding: 0; width: auto; cursor: pointer; }
+  .tx .amt { text-align: right; font-size: 14px; }
+  .tx .del { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; text-decoration: underline; justify-self: end; }
+
+  /* ---- setup / categories ---- */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 14px;
+    border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 6px 4px 11px;
+  }
+  .chip.disc { border-color: var(--flag); }
+  .chip button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; }
+  .chip .cut { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .chip.disc .cut { color: var(--flag); border-color: var(--flag); }
+  .addchip { display: flex; gap: 6px; }
+  .addchip input { flex: 1; }
+  .setup h3 { font-size: 15px; margin: 18px 0 2px; }
+  .setup p.note { margin-top: 2px; }
+  .welcome { margin-top: 18px; }
+  .welcome h2 { font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .welcome .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+  details.settings summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+  footer { margin-top: 40px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+  footer p { margin: 0 0 8px; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1 id="title">Cash Flow</h1>
+      <p id="tagline">Log what comes in and what goes out. See where your money actually goes each month.</p>
+    </div>
+  </header>
+
+  <!-- first visit: set up your own categories -->
+  <div id="setupView" hidden>
+    <div class="card welcome setup">
+      <h2>Set it up for you</h2>
+      <p class="note">Takes a minute. You can change all of this later.</p>
+
+      <h3>Your name <span style="color:var(--muted);font-weight:400">(optional)</span></h3>
+      <input id="sName" placeholder="So the page says whose it is">
+
+      <h3>Currency</h3>
+      <select id="sCur">
+        <option value="$">$ (USD)</option>
+        <option value="£">£ (GBP)</option>
+        <option value="€">€ (EUR)</option>
+        <option value="$">$ (CAD / AUD)</option>
+      </select>
+
+      <h3>Where your money comes from</h3>
+      <p class="note">Jobs, side gigs, allowance, whatever. Mine started as reffing, coaching and camps.</p>
+      <div class="chips" id="sIncome"></div>
+      <div class="addchip"><input id="sIncomeNew" placeholder="Add an income source"><button class="plain" data-add="income">Add</button></div>
+
+      <h3>What you spend on</h3>
+      <p class="note">Tap <b>could cut</b> on anything you'd count as optional. That's what the discretionary number tracks.</p>
+      <div class="chips" id="sSpend"></div>
+      <div class="addchip"><input id="sSpendNew" placeholder="Add a spending category"><button class="plain" data-add="spend">Add</button></div>
+
+      <div class="actions">
+        <button class="plain go" id="startBtn">Start tracking</button>
+        <button class="plain" id="demoBtn">Just show me an example first</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- main app -->
+  <div id="appView" hidden>
+
+    <div class="card log">
+      <div class="seg" role="tablist">
+        <button data-k="out" class="on">Spent</button>
+        <button data-k="in">Got paid</button>
+      </div>
+      <form id="logForm" class="logrow" autocomplete="off">
+        <div class="amtbox"><span class="curSym">$</span><input id="lAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required></div>
+        <input id="lDesc" class="full" placeholder="What was it? (e.g. Chipotle)" list="pastDescs" required>
+        <select id="lCat"></select>
+        <input id="lDate" type="date" required>
+        <button class="plain go full" type="submit" style="grid-column:1/-1">Log it</button>
+      </form>
+      <datalist id="pastDescs"></datalist>
+      <p class="logged" id="logged"></p>
+    </div>
+
+    <div id="demoBanner" class="card" style="margin-top:12px;font-size:14px" hidden>
+      You're looking at example data.
+      <button class="plain" id="leaveDemo" style="margin-left:6px;padding:4px 10px">Clear it and set up mine</button>
+    </div>
+
+    <div class="monthbar">
+      <button id="prev" aria-label="Previous month">&lsaquo;</button>
+      <span id="monthLabel"></span>
+      <button id="next" aria-label="Next month">&rsaquo;</button>
+    </div>
+
+    <div class="totals">
+      <div class="tot"><span>Money in</span><b class="num pos" id="tIn"></b></div>
+      <div class="tot"><span>Money out</span><b class="num neg" id="tOut"></b></div>
+      <div class="tot"><span>Net</span><b class="num" id="tNet"></b></div>
+      <div class="tot"><span>Could have cut</span><b class="num warn" id="tDisc"></b></div>
+    </div>
+
+    <section>
+      <h2>Where it came from</h2>
+      <div class="rows" id="incomeRows"></div>
+    </section>
+
+    <section>
+      <h2>Where it went</h2>
+      <div class="rows" id="spendRows"></div>
+    </section>
+
+    <section>
+      <h2>Biggest leaks this month</h2>
+      <div class="rows" id="leakRows"></div>
+      <p class="note">Your "could cut" spending, grouped by place. Small stuff adds up.</p>
+    </section>
+
+    <section>
+      <h2>Net by month</h2>
+      <div class="card"><svg id="trend" role="img" aria-label="Net cash flow by month"></svg></div>
+    </section>
+
+    <section>
+      <h2>Transactions</h2>
+      <div class="tools">
+        <input id="search" type="search" placeholder="Search">
+        <select id="catFilter"></select>
+      </div>
+      <div class="tx"><ul id="txList"></ul></div>
+      <button class="plain" id="moreBtn" style="margin-top:8px" hidden>Show all</button>
+      <p class="note">Change a category and it'll remember that place for next time.</p>
+    </section>
+
+    <section>
+      <details class="settings">
+        <summary>Settings and data</summary>
+        <div class="card setup" style="margin-top:10px">
+          <h3>Name</h3>
+          <input id="eName">
+          <h3>Currency</h3>
+          <select id="eCur">
+            <option value="$">$</option><option value="£">£</option><option value="€">€</option>
+          </select>
+          <h3>Income sources</h3>
+          <div class="chips" id="eIncome"></div>
+          <div class="addchip"><input id="eIncomeNew" placeholder="Add an income source"><button class="plain" data-add="income">Add</button></div>
+          <h3>Spending categories</h3>
+          <div class="chips" id="eSpend"></div>
+          <div class="addchip"><input id="eSpendNew" placeholder="Add a spending category"><button class="plain" data-add="spend">Add</button></div>
+          <p class="note">Removing a category moves its transactions to "Other".</p>
+
+          <h3>Data</h3>
+          <div class="tools">
+            <label class="plain">Import bank CSV<input type="file" id="csvFile" accept=".csv" hidden></label>
+            <button class="plain" id="exportBtn">Export CSV</button>
+            <button class="plain" id="wipeBtn">Delete everything</button>
+          </div>
+          <p class="note">Import takes any CSV with date, description and amount columns (or separate debit/credit columns). Export is a good backup since everything lives in this browser.</p>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <footer>
+    <p><b>Your data stays on your device.</b> Everything is saved in this browser only. Nothing gets uploaded, there's no account, and nobody else who opens this page can see your numbers. Clearing your browser data will clear it, so export a backup now and then.</p>
+    <p>I started this to keep track of money coming in from reffing, coaching and camps on both sides of the Atlantic. Plain HTML, CSS and JavaScript. Built by Cole Souder.</p>
+  </footer>
+
+</div>
+
+<script>
+// ---------- defaults for new people ----------
+const DEFAULT_INCOME = ["Paycheck", "Side gigs", "Gifts"];
+const DEFAULT_SPEND = [
+  { name: "Rent & housing" }, { name: "Groceries" }, { name: "Gas & transport" },
+  { name: "Bills & subscriptions" }, { name: "Eating out", disc: true },
+  { name: "Snacks & coffee", disc: true }, { name: "Going out", disc: true },
+  { name: "Shopping", disc: true }
+];
+// these two always exist so nothing ever ends up uncategorized
+const OTHER_IN = "Other income", OTHER_OUT = "Other";
+
+// keyword guesses for a brand new user, before the app has learned anything.
+// only used if the matching category actually exists in their setup
+const HINTS = [
+  [/payroll|paycheck|salary|direct dep/i, "Paycheck"],
+  [/venmo|cash app|zelle|paypal/i, "Side gigs"],
+  [/rent|landlord|mortgage/i, "Rent & housing"],
+  [/giant|weis|aldi|walmart|target|kroger|publix|wegmans|tesco|sainsbury|asda|lidl|trader joe|grocery/i, "Groceries"],
+  [/sunoco|exxon|shell|bp\b|gas|fuel|uber|lyft|train|bus|parking/i, "Gas & transport"],
+  [/verizon|at&t|t-mobile|spotify|netflix|hulu|apple\.com|electric|water|internet|insurance/i, "Bills & subscriptions"],
+  [/chipotle|five guys|mcdonald|chick-?fil|doordash|uber eats|grubhub|pizza|taco|wendy|burger|subway|restaurant/i, "Eating out"],
+  [/sheetz|wawa|turkey hill|7-?eleven|starbucks|dunkin|coffee|costa|greggs/i, "Snacks & coffee"],
+  [/bar\b|pub|cinema|movie|cinemark|amc|topgolf|concert|ticket/i, "Going out"],
+  [/amazon|nike|dick'?s|target\.com|ebay|shein|clothing/i, "Shopping"]
+];
+
+// ---------- state ----------
+const KEY = "cashflow_v3";
+let state = null;
+let current = null;  // "YYYY-MM" being viewed
+let showAll = false;
+let mode = "out";    // quick log toggle
+
+function blankState() {
+  return {
+    name: "", cur: "$",
+    income: DEFAULT_INCOME.slice(),
+    spend: DEFAULT_SPEND.map(s => ({ ...s })),
+    tx: [], memory: {}, demo: false, setUp: false
+  };
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.tx)) return s;
+  } catch (e) { /* storage blocked (private mode etc), just start fresh */ }
+  return blankState();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+// ---------- category helpers ----------
+const incomeCats = () => [...state.income, OTHER_IN];
+const spendCats = () => [...state.spend.map(s => s.name), OTHER_OUT];
+const isDisc = c => state.spend.some(s => s.name === c && s.disc);
+const isIncome = c => incomeCats().includes(c);
+
+// strips store numbers etc so "SHEETZ 0391" and "Sheetz #12" count as the same place
+function placeKey(desc) {
+  return desc.toUpperCase().replace(/[#*]?\d{2,}/g, "").replace(/[^A-Z&' ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function guessCat(desc, isIn) {
+  const valid = isIn ? incomeCats() : spendCats();
+  const learned = state.memory[placeKey(desc)];
+  if (learned && valid.includes(learned)) return learned;
+  for (const [re, c] of HINTS) if (re.test(desc) && valid.includes(c)) return c;
+  return isIn ? OTHER_IN : OTHER_OUT;
+}
+
+// ---------- formatting ----------
+const $ = id => document.getElementById(id);
+const fmt = n => (n < 0 ? "-" : "") + state.cur + Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+const fmt2 = n => (n < 0 ? "-" : "+") + state.cur + Math.abs(n).toFixed(2);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+function monthName(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+function months() {
+  const set = new Set(state.tx.map(t => t.date.slice(0, 7)));
+  set.add(today().slice(0, 7)); // always show the current month, even if empty
+  return [...set].sort();
+}
+
+// ---------- category editor (used on setup screen and in settings) ----------
+function renderChips(incomeEl, spendEl) {
+  $(incomeEl).innerHTML = state.income.map((c, i) =>
+    `<span class="chip">${esc(c)}<button data-rm-in="${i}" aria-label="Remove ${esc(c)}">&times;</button></span>`).join("");
+  $(spendEl).innerHTML = state.spend.map((s, i) =>
+    `<span class="chip${s.disc ? " disc" : ""}">${esc(s.name)}
+      <button class="cut" data-cut="${i}" title="Count as optional spending">could cut</button>
+      <button data-rm-out="${i}" aria-label="Remove ${esc(s.name)}">&times;</button></span>`).join("");
+}
+
+function addCategory(kind, input) {
+  const name = input.value.trim();
+  input.value = "";
+  if (!name) return;
+  const all = [...incomeCats(), ...spendCats()].map(c => c.toLowerCase());
+  if (all.includes(name.toLowerCase())) return; // no duplicates
+  if (kind === "income") state.income.push(name);
+  else state.spend.push({ name });
+  save(); refreshEditors();
+}
+
+function removeCategory(kind, i) {
+  const name = kind === "income" ? state.income[i] : state.spend[i].name;
+  if (kind === "income") state.income.splice(i, 1); else state.spend.splice(i, 1);
+  state.tx.forEach(t => { if (t.cat === name) t.cat = kind === "income" ? OTHER_IN : OTHER_OUT; });
+  for (const k in state.memory) if (state.memory[k] === name) delete state.memory[k];
+  save(); refreshEditors();
+}
+
+function refreshEditors() {
+  renderChips("sIncome", "sSpend");
+  renderChips("eIncome", "eSpend");
+  if (state.setUp) render();
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.rmIn !== undefined) removeCategory("income", +b.dataset.rmIn);
+  else if (b.dataset.rmOut !== undefined) removeCategory("spend", +b.dataset.rmOut);
+  else if (b.dataset.cut !== undefined) { const s = state.spend[+b.dataset.cut]; s.disc = !s.disc; save(); refreshEditors(); }
+  else if (b.dataset.add) addCategory(b.dataset.add, b.previousElementSibling);
+});
+// enter key in an "add" box adds the category instead of doing nothing
+document.querySelectorAll(".addchip input").forEach(inp =>
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.nextElementSibling.click(); } }));
+
+// ---------- views ----------
+function showView() {
+  $("setupView").hidden = state.setUp;
+  $("appView").hidden = !state.setUp;
+  $("title").textContent = state.name ? `${state.name}'s Cash Flow` : "Cash Flow";
+  if (!state.setUp) {
+    $("sName").value = state.name; $("sCur").value = state.cur;
+    renderChips("sIncome", "sSpend");
+  } else {
+    $("eName").value = state.name; $("eCur").value = state.cur;
+    renderChips("eIncome", "eSpend");
+    render();
+  }
+}
+
+$("startBtn").onclick = () => {
+  state.name = $("sName").value.trim();
+  state.cur = $("sCur").value;
+  state.setUp = true;
+  save(); showView();
+  $("lAmt").focus();
+};
+$("demoBtn").onclick = () => {
+  const keep = { name: state.name };
+  state = blankState();
+  state.tx = makeSample();
+  state.demo = true; state.setUp = true; state.name = keep.name;
+  save(); current = null; showView();
+};
+$("leaveDemo").onclick = () => {
+  state = blankState();
+  save(); current = null; showView();
+};
+
+$("eName").onchange = () => { state.name = $("eName").value.trim(); save(); showView(); };
+$("eCur").onchange = () => { state.cur = $("eCur").value; save(); render(); };
+
+// ---------- quick log ----------
+function fillCatSelect(keep) {
+  const cats = mode === "in" ? incomeCats() : spendCats();
+  $("lCat").innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join("");
+  if (keep && cats.includes(keep)) $("lCat").value = keep;
+}
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+  mode = b.dataset.k;
+  document.querySelectorAll(".seg button").forEach(x => x.classList.toggle("on", x === b));
+  $("lDesc").placeholder = mode === "in" ? "Who paid you? (e.g. Saturday shift)" : "What was it? (e.g. Chipotle)";
+  fillCatSelect(guessCat($("lDesc").value, mode === "in"));
+});
+// as you type, pick the category it thinks you mean (you can still change it)
+let catTouched = false;
+$("lCat").onchange = () => { catTouched = true; };
+$("lDesc").oninput = () => {
+  if (!catTouched) $("lCat").value = guessCat($("lDesc").value, mode === "in");
+};
+
+$("logForm").onsubmit = e => {
+  e.preventDefault();
+  const amount = Math.abs(parseFloat($("lAmt").value));
+  const desc = $("lDesc").value.trim();
+  if (!amount || !desc) return;
+  const cat = $("lCat").value;
+  const t = { id: Date.now() + Math.random(), date: $("lDate").value || today(), desc, amt: mode === "in" ? amount : -amount, cat };
+  state.tx.push(t);
+  state.memory[placeKey(desc)] = cat;
+  save();
+  current = t.date.slice(0, 7);
+  $("logged").textContent = `Logged ${fmt2(t.amt)} for ${desc} (${cat}).`;
+  $("lAmt").value = ""; $("lDesc").value = ""; catTouched = false;
+  fillCatSelect();
+  render();
+  $("lAmt").focus();
+};
+
+// ---------- main render ----------
+function render() {
+  document.querySelectorAll(".curSym").forEach(s => s.textContent = state.cur);
+  $("demoBanner").hidden = !state.demo;
+  if (!$("lCat").options.length) fillCatSelect();
+
+  const ms = months();
+  if (!ms.includes(current)) current = ms[ms.length - 1];
+  const i = ms.indexOf(current);
+  $("prev").disabled = i <= 0;
+  $("next").disabled = i >= ms.length - 1;
+  $("monthLabel").textContent = monthName(current);
+
+  const tx = state.tx.filter(t => t.date.startsWith(current));
+  let tin = 0, tout = 0, disc = 0;
+  const byCat = {};
+  tx.forEach(t => {
+    byCat[t.cat] = (byCat[t.cat] || 0) + t.amt;
+    if (t.amt > 0) tin += t.amt; else tout += -t.amt;
+    if (isDisc(t.cat)) disc += -t.amt;
+  });
+
+  $("tIn").textContent = fmt(tin);
+  $("tOut").textContent = fmt(-tout);
+  const net = tin - tout;
+  $("tNet").textContent = (net > 0 ? "+" : "") + fmt(net);
+  $("tNet").className = "num " + (net >= 0 ? "pos" : "neg");
+  $("tDisc").textContent = fmt(disc) + (tout ? ` · ${Math.round(disc / tout * 100)}%` : "");
+
+  const inc = Object.entries(byCat).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const spd = Object.entries(byCat).filter(([c, v]) => v < 0).map(([c, v]) => [c, -v]).sort((a, b) => b[1] - a[1]);
+  $("incomeRows").innerHTML = bars(inc, tin, "var(--in)", "Nothing logged as income this month yet.");
+  $("spendRows").innerHTML = bars(spd, tout, "var(--out)", "No spending logged this month yet.");
+
+  const leaks = {};
+  tx.filter(t => isDisc(t.cat)).forEach(t => {
+    const k = placeKey(t.desc);
+    leaks[k] = leaks[k] || { label: t.desc, total: 0, n: 0 };
+    leaks[k].total += -t.amt; leaks[k].n++;
+  });
+  const top = Object.values(leaks).sort((a, b) => b.total - a.total).slice(0, 4);
+  $("leakRows").innerHTML = top.length ? top.map(v =>
+    `<div class="row"><div class="top"><span>${esc(v.label)} <span style="color:var(--muted)">&times;${v.n}</span></span><span class="num">${fmt(-v.total)}</span></div>
+     <div class="note" style="margin:2px 0 0">about ${fmt(v.total / v.n)} each time</div></div>`
+  ).join("") : `<div class="empty">Nothing from your "could cut" categories this month.</div>`;
+
+  // keep the category filter in sync with whatever categories exist now
+  const f = $("catFilter").value;
+  $("catFilter").innerHTML = `<option value="">All categories</option>` +
+    [...incomeCats(), ...spendCats()].map(c => `<option${c === f ? " selected" : ""}>${esc(c)}</option>`).join("");
+
+  // autocomplete with things you've logged before
+  $("pastDescs").innerHTML = [...new Set(state.tx.map(t => t.desc))].slice(-200).map(d => `<option value="${esc(d)}">`).join("");
+
+  drawTrend(ms);
+  renderList(tx);
+}
+
+function bars(list, total, color, emptyMsg) {
+  if (!list.length) return `<div class="empty">${emptyMsg}</div>`;
+  const max = list[0][1];
+  return list.map(([c, v]) => `
+    <div class="row">
+      <div class="top"><span>${esc(c)}${isDisc(c) ? '<span class="tag">could cut</span>' : ""}</span>
+      <span class="num">${fmt(v)} <span style="color:var(--muted)">${Math.round(v / total * 100)}%</span></span></div>
+      <div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:${isDisc(c) ? "var(--flag)" : color}"></div></div>
+    </div>`).join("");
+}
+
+function drawTrend(ms) {
+  const svg = $("trend");
+  const W = svg.clientWidth || 600, H = 150, pad = 22;
+  const data = ms.slice(-6).map(m => ({ m, n: state.tx.filter(t => t.date.startsWith(m)).reduce((s, t) => s + t.amt, 0) }));
+  const max = Math.max(...data.map(d => Math.abs(d.n)), 1);
+  const zero = H / 2;
+  const bw = (W - 10) / data.length;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML =
+    `<line x1="0" x2="${W}" y1="${zero}" y2="${zero}" stroke="var(--line)"/>` +
+    data.map((d, i) => {
+      const h = Math.abs(d.n) / max * (zero - pad);
+      const w = Math.min(bw * 0.6, 70), x = 5 + i * bw + (bw - w) / 2;
+      const y = d.n >= 0 ? zero - h : zero;
+      const lbl = new Date(d.m + "-01T12:00").toLocaleString("en-US", { month: "short" });
+      const sel = d.m === current;
+      return `<g style="cursor:pointer" data-m="${d.m}">
+        <rect x="${x - 4}" y="0" width="${w + 8}" height="${H}" fill="transparent"/>
+        <rect x="${x}" y="${y}" width="${w}" height="${Math.max(h, 1)}" rx="3" fill="${d.n >= 0 ? "var(--in)" : "var(--out)"}" opacity="${sel ? 1 : .45}"/>
+        <text x="${x + w / 2}" y="${d.n >= 0 ? y - 5 : y + h + 13}" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="var(--ink)">${(d.n > 0 ? "+" : "") + Math.round(d.n)}</text>
+        <text x="${x + w / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="${sel ? 600 : 400}">${lbl}</text>
+      </g>`;
+    }).join("");
+  svg.querySelectorAll("g[data-m]").forEach(g => g.onclick = () => { current = g.dataset.m; showAll = false; render(); });
+}
+
+function renderList(tx) {
+  const q = $("search").value.trim().toLowerCase();
+  const cf = $("catFilter").value;
+  const shown = tx.filter(t => (!q || t.desc.toLowerCase().includes(q)) && (!cf || t.cat === cf))
+                  .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  const limit = showAll || q || cf ? shown.length : 12;
+  $("moreBtn").hidden = shown.length <= limit;
+  $("moreBtn").textContent = `Show all ${shown.length}`;
+  const opts = t => (t.amt > 0 ? incomeCats() : spendCats())
+    .map(c => `<option${c === t.cat ? " selected" : ""}>${esc(c)}</option>`).join("");
+  $("txList").innerHTML = shown.length ? shown.slice(0, limit).map(t => `
+    <li>
+      <span class="desc">${esc(t.desc)}</span>
+      <span class="amt ${t.amt > 0 ? "pos" : ""}">${fmt2(t.amt)}</span>
+      <span class="meta">${t.date.slice(5).replace("-", "/")} &middot;
+        <select data-id="${t.id}" aria-label="Category">${opts(t)}</select></span>
+      <button class="del" data-del="${t.id}">delete</button>
+    </li>`).join("")
+    : `<li class="empty" style="padding-left:12px">${tx.length ? "No matches." : "Nothing logged this month yet. Use the box at the top."}</li>`;
+}
+
+$("txList").addEventListener("change", e => {
+  const t = state.tx.find(x => String(x.id) === e.target.dataset.id);
+  if (!t) return;
+  t.cat = e.target.value;
+  // remember it, and fix up anything else from the same place
+  const k = placeKey(t.desc);
+  state.memory[k] = t.cat;
+  state.tx.forEach(x => { if (placeKey(x.desc) === k && (x.amt > 0) === (t.amt > 0)) x.cat = t.cat; });
+  save(); render();
+});
+$("txList").addEventListener("click", e => {
+  const id = e.target.dataset && e.target.dataset.del;
+  if (!id) return;
+  state.tx = state.tx.filter(x => String(x.id) !== id);
+  save(); render();
+});
+
+$("prev").onclick = () => { const ms = months(); current = ms[ms.indexOf(current) - 1]; showAll = false; render(); };
+$("next").onclick = () => { const ms = months(); current = ms[ms.indexOf(current) + 1]; showAll = false; render(); };
+$("search").oninput = () => render();
+$("catFilter").onchange = () => render();
+$("moreBtn").onclick = () => { showAll = true; render(); };
+window.addEventListener("resize", () => state.setUp && drawTrend(months()));
+
+// ---------- csv import / export ----------
+// small parser, handles quoted fields with commas in them
+function parseCSV(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function toISO(s) {
+  s = s.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    const y = m[3].length === 2 ? "20" + m[3] : m[3];
+    // UK banks write day first. if the first number can't be a month, swap
+    const [a, b] = +m[1] > 12 || state.cur === "£" ? [m[2], m[1]] : [m[1], m[2]];
+    return `${y}-${a.padStart(2, "0")}-${b.padStart(2, "0")}`;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d.toISOString().slice(0, 10);
+}
+const toNum = s => parseFloat(String(s || "").replace(/[$£€,\s]/g, "").replace(/^\((.*)\)$/, "-$1")) || 0;
+
+function importCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return;
+  const head = rows.shift().map(h => h.toLowerCase().trim());
+  const col = (...names) => head.findIndex(h => names.some(n => h.includes(n)));
+  const iDate = col("date"), iDesc = col("description", "memo", "payee", "name", "details");
+  const iCat = col("category");
+  const iAmt = col("amount"), iDebit = col("debit", "withdrawal", "paid out"), iCredit = col("credit", "deposit", "paid in");
+  if (iDate < 0 || iDesc < 0 || (iAmt < 0 && iDebit < 0)) {
+    alert("Couldn't find date, description and amount columns in that file.");
+    return;
+  }
+  if (state.demo) { state.tx = []; state.demo = false; }
+  let n = 0;
+  rows.forEach(r => {
+    const date = toISO(r[iDate] || "");
+    if (!date) return;
+    const amt = iAmt >= 0 ? toNum(r[iAmt]) : toNum(r[iCredit]) - Math.abs(toNum(r[iDebit]));
+    if (!amt) return;
+    const desc = (r[iDesc] || "").trim();
+    let cat = iCat >= 0 ? (r[iCat] || "").trim() : "";
+    const valid = amt > 0 ? incomeCats() : spendCats();
+    if (!valid.includes(cat)) cat = guessCat(desc, amt > 0);
+    state.tx.push({ id: Date.now() + Math.random(), date, desc, amt, cat });
+    n++;
+  });
+  save(); current = null; render();
+  $("logged").textContent = `Imported ${n} transactions.`;
+}
+function exportCSV() {
+  const lines = ["Date,Description,Amount,Category"];
+  state.tx.slice().sort((a, b) => a.date.localeCompare(b.date))
+    .forEach(t => lines.push([t.date, `"${t.desc.replace(/"/g, '""')}"`, t.amt.toFixed(2), `"${t.cat}"`].join(",")));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+  a.download = `cashflow-${today()}.csv`;
+  a.click();
+}
+$("csvFile").onchange = e => {
+  const f = e.target.files[0];
+  if (f) f.text().then(importCSV);
+  e.target.value = "";
+};
+$("exportBtn").onclick = exportCSV;
+$("wipeBtn").onclick = () => {
+  if (!confirm("Delete all your transactions and settings from this browser? This can't be undone.")) return;
+  state = blankState(); save(); current = null; showView();
+};
+
+// ---------- example data (for the "show me an example" button) ----------
+function makeSample() {
+  let seed = 717;
+  const r = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const pick = a => a[Math.floor(r() * a.length)];
+  const money = (lo, hi) => Math.round((lo + r() * (hi - lo)) * 100) / 100;
+  const out = [];
+  const now = new Date();
+  for (let back = 5; back >= 0; back--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+    const y = d.getFullYear(), m = d.getMonth() + 1;
+    const lastDay = back === 0 ? now.getDate() : 28;
+    const day = () => 1 + Math.floor(r() * lastDay);
+    const add = (dd, desc, amt, cat) => out.push({
+      id: out.length + 1, date: `${y}-${String(m).padStart(2, "0")}-${String(Math.min(dd, lastDay)).padStart(2, "0")}`, desc, amt, cat
+    });
+
+    add(1, "Paycheck", money(780, 900), "Paycheck");
+    add(15, "Paycheck", money(780, 900), "Paycheck");
+    for (let i = 0; i < 2 + Math.floor(r() * 3); i++) add(day(), pick(["Reffing", "Babysitting", "Lessons"]), pick([40, 50, 60, 75]), "Side gigs");
+    add(1, "Rent", -850, "Rent & housing");
+    add(4, "Phone bill", -55, "Bills & subscriptions");
+    add(9, "Spotify", -11.99, "Bills & subscriptions");
+    for (let i = 0; i < 4; i++) add(day(), pick(["Giant", "Aldi", "Weis"]), -money(30, 80), "Groceries");
+    for (let i = 0; i < 3; i++) add(day(), pick(["Sunoco", "Exxon"]), -money(35, 55), "Gas & transport");
+    for (let i = 0; i < 6 + Math.floor(r() * 8); i++) add(day(), pick(["Sheetz", "Sheetz", "Wawa", "Starbucks"]), -money(4, 14), "Snacks & coffee");
+    for (let i = 0; i < 3 + Math.floor(r() * 4); i++) add(day(), pick(["Chipotle", "DoorDash", "Five Guys"]), -money(10, 30), "Eating out");
+    for (let i = 0; i < 2; i++) add(day(), pick(["Movies", "Bowling", "Venmo to friends"]), -money(12, 45), "Going out");
+    if (r() > .3) add(day(), pick(["Amazon", "Nike"]), -money(20, 80), "Shopping");
+  }
+  return out;
+}
+
+// ---------- go ----------
+state = load();
+$("lDate").value = today();
+fillCatSelect();
+showView();
+</script>
+</body>
+</html>
